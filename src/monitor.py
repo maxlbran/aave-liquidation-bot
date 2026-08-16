@@ -32,9 +32,12 @@ WAD = 10 ** 18
 
 # ─── Event topic hashes ───────────────────────────────────────────────────────
 # Pre-computed keccak256 of event signatures (verified against Aave V3 ABI).
-TOPIC_BORROW = "0xb3d084820fb1a9decffb176436bd02b1b19a981433a6b84e20f3d5a1ecdf94ae"
-TOPIC_REPAY  = "0xa534c8dbe71f871f9f3aecd0a33c6a1d9bc2b73f50cd285bde59ff23cd67b48e"
-# LiquidationCall - indexed: collateralAsset, debtAsset, user
+# keccak256 of each event signature — verified on-chain against Aave V3 Arbitrum pool
+# Borrow(address,address,address,uint256,uint8,uint256,uint16)
+TOPIC_BORROW = "0xb3d084820fb1a9decffb176436bd02558d15fac9b0ddfed8c465bc7359d7dce0"
+# Repay(address,address,address,uint256,bool)
+TOPIC_REPAY  = "0xa534c8dbe71f871f9f3530e97a74601fea17b426cae02e1c5aee42c96c784051"
+# LiquidationCall(address,address,address,uint256,uint256,address,bool)
 TOPIC_LIQUIDATION_CALL = "0xe413a321e8681d831f4dbccbca790d2952b56f977908e45be37335533e005286"
 
 # ─── Helper ───────────────────────────────────────────────────────────────────
@@ -89,11 +92,11 @@ class Monitor:
                 abi=self._pool_abi,
             )
 
-            # Subscribe to new block headers
-            await w3.eth.subscribe("newHeads")
-
-            # Subscribe to Aave pool logs (all events in one subscription)
-            await w3.eth.subscribe("logs", {
+            # Store subscription IDs so we can route payloads by source.
+            # web3.py 7.x wraps every message as:
+            #   {'subscription': <id>, 'result': <block_or_log_dict>}
+            block_sub_id = await w3.eth.subscribe("newHeads")
+            log_sub_id   = await w3.eth.subscribe("logs", {
                 "address": config.AAVE_POOL_ADDRESS,
                 "topics": [[
                     TOPIC_BORROW,
@@ -102,38 +105,51 @@ class Monitor:
                 ]],
             })
 
-            logger.info("Subscriptions active – streaming…")
+            logger.info(
+                "Subscriptions active – blocks=%s logs=%s",
+                block_sub_id, log_sub_id,
+            )
 
-            async for payload in w3.socket.process_subscriptions():
+            async for msg in w3.socket.process_subscriptions():
                 try:
-                    await self._dispatch(w3, payload)
+                    await self._dispatch(w3, msg, block_sub_id, log_sub_id)
                 except Exception as exc:
                     logger.exception("Error dispatching payload: %s", exc)
 
     # ─── Dispatch incoming subscription messages ────────────────────────────
-    async def _dispatch(self, w3: AsyncWeb3, payload: dict):
-        # Block header
-        if "number" in payload:
-            await self._on_block(w3, payload)
+    async def _dispatch(
+        self,
+        w3: AsyncWeb3,
+        msg: dict,
+        block_sub_id: str,
+        log_sub_id: str,
+    ):
+        # web3.py 7.x: {'subscription': id, 'result': {...}}
+        sub_id = msg.get("subscription")
+        result = msg.get("result", msg)   # fall back to msg itself for safety
+
+        if sub_id == block_sub_id or "number" in result:
+            await self._on_block(w3, result)
             return
 
-        # Log event
-        topics = payload.get("topics", [])
-        if not topics:
-            return
+        if sub_id == log_sub_id or "topics" in result:
+            topics = result.get("topics", [])
+            if not topics:
+                return
+            sig = topics[0].lower() if isinstance(topics[0], str) else topics[0].hex()
+            sig = sig if sig.startswith("0x") else "0x" + sig
 
-        sig = topics[0].lower() if isinstance(topics[0], str) else topics[0].hex()
-
-        if sig == TOPIC_BORROW:
-            await self._on_borrow(w3, payload)
-        elif sig == TOPIC_REPAY:
-            await self._on_repay(w3, payload)
-        elif sig == TOPIC_LIQUIDATION_CALL:
-            await self._on_liquidation_call(w3, payload)
+            if sig == TOPIC_BORROW:
+                await self._on_borrow(w3, result)
+            elif sig == TOPIC_REPAY:
+                await self._on_repay(w3, result)
+            elif sig == TOPIC_LIQUIDATION_CALL:
+                await self._on_liquidation_call(w3, result)
 
     # ─── Block handler ──────────────────────────────────────────────────────
     async def _on_block(self, w3: AsyncWeb3, block: dict):
-        block_number = int(block["number"], 16)
+        raw = block["number"]
+        block_number = int(raw, 16) if isinstance(raw, str) else int(raw)
         self._last_block    = block_number
         self._last_block_ts = time.time()
 
