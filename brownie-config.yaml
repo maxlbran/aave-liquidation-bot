@@ -1,0 +1,34 @@
+project_structure:
+  contracts: contracts
+  interfaces: interfaces
+  scripts: scripts
+  tests: tests
+  build: build
+
+compiler:
+  solc:
+    version: "0.8.19"
+    optimizer:
+      enabled: true
+      runs: 200
+    remappings: []
+
+networks:
+  default: arbitrum-main
+
+  arbitrum-main:
+    id: arbitrum-main
+    host: ${ALCHEMY_HTTP_URL}
+    chainid: 42161
+    explorer: https://api.arbiscan.io/api
+
+  arbitrum-sepolia:
+    id: arbitrum-sepolia
+    host: ${ALCHEMY_HTTP_URL_TESTNET}
+    chainid: 421614
+    explorer: https://api-sepolia.arbiscan.io/api
+
+dotenv: .env
+
+wallets:
+  from_key: ${PRIVATE_KEY}

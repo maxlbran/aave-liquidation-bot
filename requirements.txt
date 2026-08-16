@@ -1,0 +1,19 @@
+# ── Core ────────────────────────────────────────────────────────────────────
+web3==6.20.3
+aiohttp==3.10.5
+websockets==13.0.1
+python-dotenv==1.0.1
+
+# ── Smart contract tooling ────────────────────────────────────────────────────
+py-solc-x==2.0.4          # auto-downloads solc compiler binaries
+
+# ── Utilities ────────────────────────────────────────────────────────────────
+eth-account==0.13.2
+eth-typing==4.4.0
+hexbytes==1.2.1
+
+# ── Telegram ─────────────────────────────────────────────────────────────────
+python-telegram-bot==21.6
+
+# ── Optional: metrics / monitoring ───────────────────────────────────────────
+# prometheus-client==0.21.0

@@ -1,0 +1,12 @@
+{
+  "mainnet_42161": {
+    "address": "0xC6E03ff045DF18cEDe6141CC470475A732F55AdE",
+    "tx_hash": "5017d4aab0664139fb2e56902dc6bb5f0251e7fb50e551e603f0aa7552552ead",
+    "block": 495205745,
+    "chain_id": 42161,
+    "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
+    "router": "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+    "deployer": "0xD35bbD7feb8E05139b557284E311d9415A46Cad8",
+    "gas_used": 1160810
+  }
+}
